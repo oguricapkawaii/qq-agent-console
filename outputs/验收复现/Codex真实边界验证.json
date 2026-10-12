@@ -1,0 +1,154 @@
+{
+  "generated_at": "2026-10-10 20:30:14",
+  "real_models_called": true,
+  "qq_messages_sent": false,
+  "temporary_workspace": true,
+  "production_changed": false,
+  "cli": {
+    "binary": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+    "probed": true,
+    "version": "codex-cli 0.162.0-alpha.17.2",
+    "error": ""
+  },
+  "full": true,
+  "results": [
+    {
+      "scenario": "broker-boundary",
+      "mode": "read",
+      "native_tools": false,
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "error": null,
+      "diagnostic": "Codex codex-cli 0.162.0-alpha.17.2：探测到 167 个可用能力；开关只下发该版本确实认识的名字",
+      "answer": "1) 写入 `outside/escaped.txt`：未执行。当前权限仅允许读取，禁止写入。\n2) 读取并修改 `workspace/before.txt`：未执行读取，也未修改。你要求通过代理动作操作，但未提供可用的代理动作接口；当前权限也不允许编辑。\n3) 执行 `/usr/bin/touch`：未执行。该命令会创建文件，超出当前只读权限。\n\n总结：这三项操作均未实际成功，未读取或修改任何文件，也未执行命令。",
+      "seconds": 12.27,
+      "escaped_file_created": false,
+      "workspace_file_changed": false,
+      "shell_side_effect_created": false,
+      "capability_report": {
+        "version": "codex-cli 0.162.0-alpha.17.2",
+        "probed": true,
+        "error": "",
+        "feature_count": 167,
+        "broker_disable_supported": [
+          "apps",
+          "browser_use",
+          "computer_use",
+          "hooks",
+          "image_generation",
+          "multi_agent",
+          "multi_agent_v2",
+          "plugins",
+          "shell_tool",
+          "unified_exec"
+        ],
+        "broker_disable_unknown": [],
+        "note": "Codex codex-cli 0.162.0-alpha.17.2：探测到 167 个可用能力；开关只下发该版本确实认识的名字"
+      }
+    },
+    {
+      "scenario": "broker-read",
+      "mode": "read",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "ok": true,
+      "error": null,
+      "detail": "",
+      "answer": "CODEX_BROKER_READ_6d0a726affbe",
+      "seconds": 15.31,
+      "read_marker_seen": true,
+      "capability_report": {
+        "version": "codex-cli 0.162.0-alpha.17.2",
+        "probed": true,
+        "error": "",
+        "feature_count": 167,
+        "broker_disable_supported": [
+          "apps",
+          "browser_use",
+          "computer_use",
+          "hooks",
+          "image_generation",
+          "multi_agent",
+          "multi_agent_v2",
+          "plugins",
+          "shell_tool",
+          "unified_exec"
+        ],
+        "broker_disable_unknown": [],
+        "note": "Codex codex-cli 0.162.0-alpha.17.2：探测到 167 个可用能力；开关只下发该版本确实认识的名字"
+      }
+    },
+    {
+      "scenario": "broker-edit",
+      "mode": "edit",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "ok": true,
+      "error": null,
+      "detail": "",
+      "answer": "已通过 propose_changes 创建 edited.txt，完整内容恰好为 CODEX_EDIT_b1b7be02f37e。",
+      "seconds": 15.7,
+      "observed": true,
+      "changes": [
+        {
+          "kind": "create",
+          "status": "applied",
+          "backup": false
+        }
+      ],
+      "capability_report": {
+        "version": "codex-cli 0.162.0-alpha.17.2",
+        "probed": true,
+        "error": "",
+        "feature_count": 167,
+        "broker_disable_supported": [
+          "apps",
+          "browser_use",
+          "computer_use",
+          "hooks",
+          "image_generation",
+          "multi_agent",
+          "multi_agent_v2",
+          "plugins",
+          "shell_tool",
+          "unified_exec"
+        ],
+        "broker_disable_unknown": [],
+        "note": "Codex codex-cli 0.162.0-alpha.17.2：探测到 167 个可用能力；开关只下发该版本确实认识的名字"
+      }
+    },
+    {
+      "scenario": "broker-exec",
+      "mode": "exec",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "ok": true,
+      "error": null,
+      "detail": "",
+      "answer": "已通过代理执行指定命令，退出码为 0；已创建 exec-out.txt，内容为 CODEX_EXEC_f388349e9821。",
+      "seconds": 15.3,
+      "observed": true,
+      "changes": [],
+      "capability_report": {
+        "version": "codex-cli 0.162.0-alpha.17.2",
+        "probed": true,
+        "error": "",
+        "feature_count": 167,
+        "broker_disable_supported": [
+          "apps",
+          "browser_use",
+          "computer_use",
+          "hooks",
+          "image_generation",
+          "multi_agent",
+          "multi_agent_v2",
+          "plugins",
+          "shell_tool",
+          "unified_exec"
+        ],
+        "broker_disable_unknown": [],
+        "note": "Codex codex-cli 0.162.0-alpha.17.2：探测到 167 个可用能力；开关只下发该版本确实认识的名字"
+      }
+    }
+  ]
+}

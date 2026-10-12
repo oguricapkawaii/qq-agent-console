@@ -1,0 +1,265 @@
+# 统一控制台配置示例（schema_version 2）。
+# 通过环境变量 CONFIG_FILE=config.yaml 启用；优先级：真实环境变量 > .env > 本文件。
+# 密钥只放 .env 或环境变量，本文件写凭据的"环境变量名"（credential_env），不要写真实值。
+
+schema_version: 2
+
+qq:
+  # 允许调用模型的用户 / 允许响应的群（默认全部拒绝）
+  allowed_user_ids: [123456789]
+  allowed_group_ids: [987654321]
+  # 忽略的用户（如群内其他机器人）
+  ignore_user_ids: []
+
+storage:
+  database_path: data/bot.db
+
+# ---- 服务端口与统一 HTTP API ----
+server:
+  host: 127.0.0.1
+  port: 8080
+  # 目录锁：进程内锁只保证单进程互斥。worker>1 时必须提供跨进程锁并实测，
+  # 否则启动会直接拒绝（不能声称多进程安全）。
+  workspace_max_workers: 1
+  workspace_cross_process_lock: false
+  workspace_lock_timeout_seconds: 30
+
+# ---- 后端（Backend）：一个 provider 可挂多个后端，一个后端可暴露多个模型 ----
+# adapter 取值：openai_compatible | deepseek_harness | codex_cli | zcode_stdio | mock_harness
+backends:
+  deepseek_harness:
+    adapter: deepseek_harness
+    agent: deepseek
+    enabled: true
+    credential_env: DEEPSEEK_API_KEY
+    default_model: deepseek-flash
+    binary: /Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh
+    workdir: .
+    base_url: https://api.deepseek.com/anthropic
+    # 允许使用后端自己的原生工具（仅在隔离可验证时）。默认关闭：文件读写走公共 broker。
+    native_tools: false
+  deepseek_api:
+    adapter: openai_compatible
+    agent: deepseek
+    display_name: DeepSeek API
+    enabled: true
+    credential_env: DEEPSEEK_API_KEY
+    default_model: deepseek-chat
+    base_url: https://api.deepseek.com/v1
+    model_options:
+      deepseek-chat: []
+      deepseek-reasoner: [low, high]
+  zcode:
+    adapter: zcode_stdio
+    agent: zcode
+    # L04：推理强度决定单次调用耗时，而调用耗时受任务 deadline 约束。
+    # 实测（2026-10-10）：默认 max 下 edit/exec 各约 60s 超时（两次）；
+    # 显式 low 时 edit 15.98s、exec 29.23s 通过；text/read 在默认强度下通过。
+    # 因此带工具的模式默认 low（纯文本仍用模型目录的 default_effort=max），
+    # 需要更强推理时可以：/task zcode --effort max --mode edit …（显式优先）。
+    # 留空字符串表示"用模型目录的 default_effort"。
+    mode_efforts:
+      read: low
+      edit: low
+      exec: low
+      text: ""
+    enabled: false
+    credential_env: GLM_API_KEY
+    default_model: glm-5.3
+    catalog: data/zcode_models.json
+    base_url: https://open.bigmodel.cn/api/paas/v4
+  codex:
+    adapter: codex_cli
+    agent: codex
+    enabled: false
+    credential_env: CODEX_HOME
+    binary: codex
+    workdir: .
+    # 目录授权统一由下面的 workspaces.roots 决定（不再读 CODEX_ALLOWED_ROOTS）
+    # native_tools 默认关闭：文件读写走公共 broker。开启后只影响**原生 exec**（可写 profile
+    # qq_files）；broker/text/原生 read-edit 一律使用只读限根 profile qq_ro
+    # （工作区只读、:root deny、/tmp deny、网络关闭）。
+    # 本机真实命令级拒绝矩阵：outputs/第六轮整改/verify_codex_sandbox_matrix.py.json
+    # 注意：能力探测失败或关键安全开关缺失时适配器**拒绝启动**，不是降级放行。
+    native_tools: false
+  gpt_api:
+    adapter: openai_compatible
+    agent: gpt
+    enabled: true
+    credential_env: OPENAI_API_KEY
+    default_model: gpt-4o-mini
+    base_url: https://api.openai.com/v1
+  # 新增一个"同协议"后端/模型只需要再加一段配置（不改任何代码）
+  corp_llm:
+    adapter: openai_compatible
+    agent: corp
+    display_name: 公司内部 LLM
+    enabled: false
+    credential_env: CORP_LLM_KEY
+    default_model: corp-1
+    base_url: https://llm.example.internal/v1
+    model_options:
+      corp-1: [low, high]
+  # 新协议 harness 示例（见 app/backends/mock_adapter.py 的适配器实现）
+  mock_demo:
+    adapter: mock_harness
+    agent: mock
+    display_name: Mock Harness
+    enabled: false
+    default_model: mock-1
+    responses:
+      - '{"final": "mock reply"}'
+
+# ---- 逻辑 Agent：用户选择的入口（名字即 /task <agent> 的参数，不是独立口令）----
+agents:
+  deepseek:
+    display_name: DeepSeek
+    default_backend: deepseek_harness
+    allowed_backends: [deepseek_harness, deepseek_api]
+    # default_model 留空表示使用后端真实目录里的默认模型
+  zcode:
+    display_name: ZCode
+    default_backend: zcode
+  codex:
+    display_name: Codex
+    default_backend: codex
+  gpt:
+    display_name: GPT
+    default_backend: gpt_api
+  corp:
+    display_name: 公司 LLM
+    default_backend: corp_llm
+  mock:
+    display_name: Mock
+    default_backend: mock_demo
+
+# ---- 目录授权（唯一的目录权限来源）----
+workspaces:
+  # 不自动授权整机：只列你确实要交给机器人的目录。
+  # modes：授权成员可用模式；admin_modes：配置中管理员可用模式；
+  # users：按 QQ 号的更细授权（覆盖 modes）。
+  # 默认留空（不放行任何目录）。取消注释并改成真实存在的绝对路径即可；
+  # 路径不存在时启动会直接报错，避免"以为授权了其实没授权"。
+  roots: []
+  # roots:
+  #   - path: /Users/example/Documents/示例项目
+  #     label: 示例项目
+  #     modes: [read]                  # 普通授权成员：只读
+  #     admin_modes: [read, edit, exec] # 管理员：读写 + 受控命令
+  #     searchable: true               # 是否参与 /workspace find
+  #     users:
+  #       10001: [read, edit]          # 特定成员：可读写
+  # /workspace find 的预算：深度、候选数、条目数、耗时上限
+  find:
+    max_depth: 4
+    max_candidates: 8
+    max_entries: 20000
+    max_seconds: 2.0
+    selection_ttl_seconds: 300
+  exclude_dirs: [node_modules, .git, .venv, dist, build]
+  # 受保护范围：任何情况下都不向模型开放（默认已包含机器人项目目录、data、runtime、.env）
+  protected_paths: []
+  # 覆盖前的备份落到这里（受控目录、唯一命名、禁止覆盖/跟随符号链接）
+  backup_dir: runtime/state/backups
+  # 全局开关：关闭后即使目录 ACL 允许也不放行
+  edit_enabled: true
+  exec_enabled: true
+
+# ---- 命令层：preset 与受控命令策略 ----
+commands:
+  # 新增常用口令：只加一段 preset，解析/帮助/discovery 自动支持（不需要改代码）
+  presets:
+    review:
+      description: 用 deepseek 只读评审目录
+      agent: deepseek
+      mode: read
+      template: 请评审以下目录改动，重点关注兼容性：{task}
+      # allow_overrides 省略时：read/edit/exec 模式允许 --dir/--find，text 不允许
+    summarize:
+      description: 纯文本总结（无工具）
+      agent: gpt
+      mode: text
+      template: 请总结：{task}
+  exec:
+    enabled: true
+    # exec 必须在可验证隔离内运行（macOS sandbox-exec）。默认策略：
+    #   · 写：只允许任务工作目录与任务私有临时目录，其余一律拒绝；
+    #   · 网络：全禁（含本机回环），除非下面的 allow_network 显式打开；
+    #   · 读：**默认拒绝**，只放行系统运行库、解释器自身（含 .venv）与任务目录；
+    #     任意位置的 .env*、id_rsa/密钥（.pem/.key/.p12/.pfx/.jks/.keystore）、凭据文件
+    #     （credentials*/auth.json/secrets.yaml/session.db 等）与 .ssh/.aws/.gnupg/.codex/.zcode/.config/.git
+    #     目录都会被拒绝；workspaces.protected_paths 与项目自身目录即使位于工作目录内也拒绝；
+    #   · 文件读取的负向测试：tests/test_round3_boundaries.py（R01/R02）。
+    # 平台不支持隔离时 exec 会被明确禁用；require_sandbox=false 仅供本地排查，不要用于生产。
+    require_sandbox: true
+    allow_network: false
+    # 只放行这些可执行文件；解释器（python/node）的越界风险由上面的沙箱承担
+    allowlist: [pytest, python3, node, npm, pnpm, make, ls, cat, git, ruff, mypy]
+    max_timeout_seconds: 300
+    max_output_bytes: 262144
+    allow_network_tools: false
+  broker:
+    # 公共文件 broker 的预算：超过即任务明确失败（不静默截断）
+    max_actions: 40
+    max_rounds: 8
+    max_total_read_bytes: 262144
+    max_file_bytes: 131072
+    max_search_entries: 2000
+    # 多轮 broker 会话的整体期限（秒）：覆盖锁等待、所有模型轮次与工具调用
+    max_task_seconds: 300
+    # 说明：read/search 返回的 sha256 只是"返回内容"的摘要，用于漂移判定的是同一次
+    # 安全读取得到的全文件版本 version_sha256；单个文件超过 8MiB（app/security/safeopen.py
+    # 的 version_read_limit）时 read 会明确失败，不会用片段摘要冒充文件版本（R06）。
+
+# ---- 统一 HTTP API（/api/v1）：Token 映射可信身份 ----
+api:
+  # 推荐只写 token_env（真实值放 .env，例如 QQ_CONSOLE_API_TOKEN=...）
+  tokens:
+    - name: local-admin
+      token_env: QQ_CONSOLE_API_TOKEN
+      user_id: 123456789        # 该 Token 代表的可信 QQ 身份（不能被正文覆盖）
+      group_ids: [987654321]    # 允许操作的群
+      scopes: [task, team, workspace]
+      admin: true
+
+transport:
+  # onebot_ws | onebot_http（不要改动 NapCat/OneBot 本身的端口与登录方式）
+  kind: onebot_ws
+  onebot_ws_url: ws://127.0.0.1:3001
+  onebot_http_api_url: http://127.0.0.1:5700
+  onebot_access_token: ""
+  http_listen_host: 127.0.0.1
+  http_listen_port: 8080
+
+limits:
+  request_timeout_seconds: 60
+  max_context_turns: 8
+  max_message_length: 1500
+  max_thinking_chars: 800
+  thinking_archive_dir: runtime/state/thinking
+  # true 时同一「群 × 用户」下所有 Agent 共用一条上下文，互相可见（Agent 间对话）
+  shared_agent_context: false
+  # 旧式目录字段（FILE_READ_ROOT / FILE_WRITE_ROOT 等）仍可被识别，但会按保守规则
+  # 迁移为 workspaces.roots，并在启动日志与 /status 中列出差异；新部署请直接用
+  # workspaces.roots。留空即不迁移。
+  file_read_root: ""
+  file_write_root: ""
+  rate_limit_per_minute: 6
+  approval_ttl_seconds: 300
+
+logging:
+  level: INFO
+
+team:
+  # /team 多 Agent 协作；每步可用 --mode text|read|edit|exec 声明权限
+  enabled: true
+  max_steps: 8
+  max_active_per_user: 1
+  max_active_global: 4
+  max_parallel_steps: 2
+  max_prompt_chars: 12000
+  max_input_chars: 60000
+  max_output_chars: 30000
+  # 单轮总时限（秒）与单步时限（0 = 自动取 min(request_timeout_seconds, 300)）
+  workflow_timeout_seconds: 1800
+  step_timeout_seconds: 0
